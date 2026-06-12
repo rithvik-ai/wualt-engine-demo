@@ -1,0 +1,49 @@
+{
+  "subjects": [
+    {
+      "id": "S01",
+      "name": "Priya Singh",
+      "age": 28,
+      "sex": "F",
+      "context": "Office worker, Bengaluru",
+      "distress_window": "15:05\u201315:35",
+      "distress_label": "Approached in parking lot \u00b7 scream detected"
+    },
+    {
+      "id": "S02",
+      "name": "Lakshmi Reddy",
+      "age": 52,
+      "sex": "F",
+      "context": "Domestic worker \u00b7 pre-dawn commute, Bengaluru",
+      "distress_window": "04:33\u201304:45",
+      "distress_label": "Followed by stranger on dawn commute \u00b7 shouted for help"
+    },
+    {
+      "id": "S03",
+      "name": "Mrs Iyer",
+      "age": 71,
+      "sex": "F",
+      "context": "Retired teacher, lives alone, Mumbai",
+      "distress_window": "19:20\u201319:35",
+      "distress_label": "Kitchen fall \u00b7 on floor \u00b7 neighbour arrives"
+    },
+    {
+      "id": "S04",
+      "name": "Vidya Iyengar",
+      "age": 35,
+      "sex": "F",
+      "context": "Sales exec, anxiety disorder, Hyderabad",
+      "distress_window": "09:35\u201309:43",
+      "distress_label": "Panic attack mid-pitch"
+    },
+    {
+      "id": "S05",
+      "name": "Sushma Rao",
+      "age": 45,
+      "sex": "F",
+      "context": "Yoga instructor, home studio \u00b7 Pune",
+      "distress_window": "\u2014 (no distress event)",
+      "distress_label": "Calm day \u2014 meditation, classes, family time. Engine stays silent."
+    }
+  ]
+}

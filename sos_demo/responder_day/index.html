@@ -1,0 +1,1905 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WUALT — Responder Dashboard</title>
+<style>
+  :root { color-scheme: dark; }
+  *  { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+         margin: 0; background: #0a0d12; color: #e8ecf1; min-height: 100vh; }
+  .page { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px;
+          padding: 14px; min-height: 100vh; }
+  @media (max-width: 980px) { .page { grid-template-columns: 1fr; } }
+
+  /* ── shared ─────────────────────────────────────────── */
+  .card { background: #141821; border: 1px solid #232a36;
+          border-radius: 10px; padding: 14px; }
+  .card h3 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase;
+             letter-spacing: 1.2px; color: #7a8497; font-weight: 700; }
+  .row { display: flex; gap: 10px; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .small { font-size: 11.5px; color: #7a8497; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  /* ── header strip — pulses red during active SOS ──── */
+  .alert-bar { padding: 12px 18px; border-radius: 10px;
+               display: flex; align-items: center; justify-content: space-between;
+               margin-bottom: 14px; border: 1px solid transparent;
+               background: linear-gradient(90deg, #1f2530, #1a1e27);
+               border-color: #2c3340; }
+  .alert-bar.active { background: linear-gradient(90deg, #2a0e0e, #1a0808);
+                      border-color: #842323; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50%     { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+  }
+  .alert-status { display: flex; align-items: center; gap: 12px; }
+  .alert-pulse { width: 12px; height: 12px; border-radius: 50%;
+                 background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+  .alert-bar:not(.active) .alert-pulse { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .alert-title { font-size: 16px; font-weight: 700; }
+  .alert-meta  { font-size: 12px; color: #b0b8c8; }
+  .alert-right { display: flex; gap: 14px; align-items: center; font-size: 12.5px; }
+
+  /* ── identity card ────────────────────────────────── */
+  .ident { display: flex; gap: 14px; }
+  .avatar { width: 64px; height: 64px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; font-weight: 700; flex-shrink: 0; }
+  .ident-info { flex: 1; }
+  .ident-name { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+  .ident-sub  { font-size: 12px; color: #8a93a3; margin-bottom: 8px; }
+  .ident-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;
+                font-size: 12px; }
+  .ident-key  { color: #7a8497; }
+  .ident-val  { color: #e8ecf1; }
+
+  /* ── location card ────────────────────────────────── */
+  .map { height: 130px; border-radius: 8px; position: relative;
+         background: linear-gradient(135deg, #1c2535 0%, #243049 50%, #1c2535 100%);
+         border: 1px solid #2c3340; overflow: hidden; margin-bottom: 10px; }
+  .map::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .map-pin { position: absolute; top: 50%; left: 50%;
+             width: 20px; height: 20px; border-radius: 50%;
+             background: #ef4444; transform: translate(-50%, -50%);
+             box-shadow: 0 0 0 4px rgba(239,68,68,0.35);
+             animation: pin-pulse 2s ease-in-out infinite; }
+  @keyframes pin-pulse {
+    0%,100% { box-shadow: 0 0 0 4px rgba(239,68,68,0.35); }
+    50%     { box-shadow: 0 0 0 14px rgba(239,68,68,0); }
+  }
+  .map-acc { position: absolute; top: 50%; left: 50%;
+             width: 80px; height: 80px; border-radius: 50%;
+             border: 1px solid rgba(239,68,68,0.4); background: rgba(239,68,68,0.06);
+             transform: translate(-50%, -50%); }
+  .loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12px; }
+
+  /* ── ENERGY BARS — the key widgets ──────────────── */
+  .vital { background: #0f131b; border: 1px solid #232a36; border-radius: 8px;
+           padding: 10px 12px; }
+  .vital-top { display: flex; justify-content: space-between; align-items: baseline;
+               margin-bottom: 8px; }
+  .vital-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px;
+                 color: #7a8497; font-weight: 700; }
+  .vital-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .vital-unit  { font-size: 11px; color: #7a8497; margin-left: 4px; }
+  .vital-trend { font-size: 11px; color: #8a93a3; margin-left: 6px; }
+  .vital-bar { position: relative; height: 12px; border-radius: 6px;
+               background: linear-gradient(90deg, #1a3925 0%, #3a3318 50%, #3a1818 100%);
+               overflow: hidden; }
+  .vital-bar::before { content: ""; position: absolute; inset: 0;
+                       background: linear-gradient(90deg,
+                         rgba(74,222,128,0.10) 0%,
+                         rgba(253,224,71,0.10) 50%,
+                         rgba(239,68,68,0.10) 100%); }
+  .vital-fill { position: absolute; top: 0; bottom: 0; left: 0;
+                width: 0%; background: #4ade80;
+                border-right: 2px solid #fff; transition: width .35s, background .35s; }
+  .vital-fill.warn   { background: #facc15; }
+  .vital-fill.danger { background: #ef4444; }
+  .vital-baseline { position: absolute; top: -2px; bottom: -2px;
+                    width: 2px; background: rgba(255,255,255,0.45); }
+  .vital-baseline::after {
+    content: "base"; position: absolute; top: -16px; left: -10px;
+    font-size: 9px; color: rgba(255,255,255,0.45); text-transform: uppercase; }
+  .vital-ticks { display: flex; justify-content: space-between;
+                 font-size: 9px; color: #4a5163; margin-top: 4px; }
+
+  /* ── audio panel ──────────────────────────────────── */
+  .audio-toggle { display: inline-flex; align-items: center; gap: 8px;
+                  padding: 8px 14px; background: linear-gradient(180deg, #2563eb, #1e40af);
+                  color: white; border: 0; border-radius: 8px; cursor: pointer;
+                  font-size: 13px; font-weight: 600; }
+  .audio-toggle.live { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff;
+              animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .sound-chip { display: inline-block; padding: 4px 10px; border-radius: 999px;
+                background: #1f2530; border: 1px solid #2c3340; font-size: 11.5px;
+                margin-right: 6px; }
+  .sound-chip.danger { background: #2a1818; border-color: #5a2424; color: #fca5a5; }
+  .danger-score { font-size: 11px; color: #8a93a3; margin-top: 8px; }
+
+  /* ── engine verdict ──────────────────────────────── */
+  .state-pill { display: inline-block; padding: 8px 18px; border-radius: 999px;
+                font-size: 16px; font-weight: 800; letter-spacing: 1px;
+                text-transform: uppercase; }
+  .state-normal   { background: #16291f; color: #6ee7b7; border: 1px solid #1f3f30; }
+  .state-stress   { background: #2a2716; color: #fde68a; border: 1px solid #4a3f1a; }
+  .state-distress { background: #2a1818; color: #fca5a5; border: 1px solid #4a2222; }
+  .verdict-meta { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; }
+  .signal-chip { display: inline-block; padding: 3px 9px; border-radius: 999px;
+                 background: #1f2530; border: 1px solid #2c3340;
+                 font-size: 11px; margin-right: 5px; margin-top: 5px; }
+
+  /* ── tier indicator ─────────────────────────────── */
+  .tier-row { display: grid; grid-template-columns: repeat(4, 1fr) 36px; gap: 6px;
+              align-items: center; }
+  .tier { padding: 10px 8px; border-radius: 8px; text-align: center;
+          border: 1px solid #2c3340; background: #1a1e27;
+          font-size: 11px; color: #6b7280; transition: all .2s; }
+  .tier-name { font-weight: 700; font-size: 11px; letter-spacing: 0.5px; }
+  .tier-target { font-size: 10px; color: #7a8497; margin-top: 2px; }
+  .tier-status { font-size: 9.5px; margin-top: 4px; padding: 2px 6px; border-radius: 6px;
+                 background: #1f2530; display: inline-block; }
+  .tier.pending  { opacity: 0.65; }
+  .tier.notified { background: #2a2716; border-color: #5a4520; color: #fde68a; }
+  .tier.notified .tier-status { background: #4a3f1a; color: #fde68a; }
+  .tier.responded { background: #16291f; border-color: #1f3f30; color: #6ee7b7; }
+  .tier.responded .tier-status { background: #1f3f30; color: #6ee7b7; }
+  .tier.firing { background: #2a1818; border-color: #5a2424; color: #fca5a5;
+                 animation: tier-glow 1.4s ease-in-out infinite; }
+  .tier.firing .tier-status { background: #4a2222; color: #fca5a5; }
+  @keyframes tier-glow {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50%     { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+  }
+  .tier-arrow { color: #4a5163; text-align: center; font-size: 18px; }
+
+  /* ── timeline ────────────────────────────────────── */
+  .timeline { max-height: 220px; overflow-y: auto; font-size: 12px; }
+  .timeline > div { padding: 6px 8px; border-bottom: 1px dashed #232a36;
+                    display: grid; grid-template-columns: 70px 1fr; gap: 10px; }
+  .timeline > div:hover { background: #0d1218; }
+  .ts { color: #7a8497; font-family: ui-monospace, monospace; font-size: 11px; }
+  .ev-msg { color: #d6dbe4; }
+  .ev-press   { color: #fca5a5; font-weight: 600; }
+  .ev-tier    { color: #fde68a; font-weight: 600; }
+  .ev-resolve { color: #6ee7b7; font-weight: 600; }
+
+  /* ── actions ─────────────────────────────────────── */
+  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .action { padding: 11px 8px; border-radius: 8px; border: 1px solid #2c3340;
+            background: #1a1e27; color: #e8ecf1; cursor: pointer; font: inherit;
+            font-size: 12.5px; font-weight: 600; }
+  .action:hover { background: #252b37; }
+  .action.dispatch { background: linear-gradient(180deg, #ef4444, #b91c1c);
+                     border: 0; color: white; }
+  .action.escalate { background: #2a2716; border-color: #5a4520; color: #fde68a; }
+  .action.resolve  { background: #16291f; border-color: #1f3f30; color: #6ee7b7; }
+
+  /* ── SIMULATOR side ───────────────────────────────── */
+  .sim h3 { color: #8b5cf6; }
+  .sim .card { border-color: #2a2540; }
+  .preset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .preset { padding: 8px 6px; border-radius: 6px; font-size: 12px;
+            background: #1a1e27; color: #e8ecf1; border: 1px solid #2c3340;
+            cursor: pointer; font: inherit; font-weight: 500; transition: all .15s; }
+  .preset:hover { background: #252b37; border-color: #3b82f6; }
+  .ctl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; align-items: end; }
+  .ctl label { display: block; font-size: 10.5px; text-transform: uppercase;
+               letter-spacing: 0.5px; color: #7a8497; margin-bottom: 3px;
+               font-weight: 600; }
+  .ctl input[type=number], .ctl select {
+    width: 100%; background: #0d1218; color: #e8ecf1;
+    border: 1px solid #2c3340; padding: 6px 8px; border-radius: 5px;
+    font: inherit; font-size: 12.5px;
+  }
+  .ctl input[type=range] { width: 100%; }
+  .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .toggle-grid label { display: flex; align-items: center; gap: 5px;
+                        font-size: 12px; color: #d6dbe4; padding: 4px 0; cursor: pointer; }
+  .toggle-grid input[type=checkbox] { accent-color: #8b5cf6; }
+  .sim-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .sim-actions button { padding: 8px; font-size: 12px; border-radius: 6px;
+                        background: #1a1e27; border: 1px solid #2c3340;
+                        color: #e8ecf1; cursor: pointer; font: inherit; }
+  .sim-press {
+    background: linear-gradient(180deg, #ef4444, #b91c1c) !important;
+    border: 0 !important; color: white !important; font-weight: 700;
+    box-shadow: 0 3px 10px rgba(239,68,68,0.3);
+  }
+  .sim-reset {
+    background: #2a2540 !important; border-color: #4a3b6a !important;
+    color: #c4b5fd !important;
+  }
+</style>
+</head><body>
+
+<div class="page">
+
+  <!-- ═══════════ RESPONDER DASHBOARD ═══════════ -->
+  <div>
+
+    <!-- Top alert strip -->
+    <div class="alert-bar" id="alertBar">
+      <div class="alert-status">
+        <div class="alert-pulse"></div>
+        <div>
+          <div class="alert-title" id="alertTitle">No active SOS</div>
+          <div class="alert-meta" id="alertMeta">All cases resolved · waiting</div>
+        </div>
+      </div>
+      <div class="alert-right">
+        <span class="small">Case #</span>
+        <span class="mono" id="caseId">—</span>
+        <span class="small">·</span>
+        <span class="small">Elapsed</span>
+        <span class="mono" id="elapsed">00:00</span>
+      </div>
+    </div>
+
+    <div class="stack">
+
+      <!-- ── Per-frame inference  vs  Persistence-gated state ── -->
+      <div class="row-2">
+        <!-- LEFT: per-frame classifier output (changes every frame) -->
+        <div class="card" style="border-color: #4a3520;">
+          <h3 style="color: #fdba74;">Per-frame inference <span class="small" style="text-transform:none;letter-spacing:0;font-weight:400;color:#a89368;">— live model output</span></h3>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px;">
+            <div id="perFrameState" style="font-size: 26px; font-weight: 800; letter-spacing: 1px;">NORMAL</div>
+            <div class="small" id="perFrameMeta">frame —</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12px;">
+            <div class="ident-key">distress confidence</div>
+            <div class="ident-val mono" id="perFrameConf">0.00</div>
+            <div class="ident-key">weighted score</div>
+            <div class="ident-val mono" id="perFrameWScore">0.000</div>
+            <div class="ident-key">flagged signals</div>
+            <div class="ident-val" id="perFrameSignals">none</div>
+            <div class="ident-key">motion class</div>
+            <div class="ident-val" id="perFrameMotion">—</div>
+          </div>
+          <div style="margin-top: 8px;">
+            <div class="small" style="margin-bottom: 4px;">last 30 frames</div>
+            <div id="perFrameHistory" style="display: flex; gap: 3px; height: 14px;"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: persistence-gated state machine output (only changes after 60s sustained) -->
+        <div class="card" style="border-color: #1f3f30;">
+          <h3 style="color: #6ee7b7;">State machine <span class="small" style="text-transform:none;letter-spacing:0;font-weight:400;color:#3a7a55;">— persistence-gated, decision-grade</span></h3>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px;">
+            <div id="finalState" style="font-size: 26px; font-weight: 800; letter-spacing: 1px;">NORMAL</div>
+            <div class="small" id="finalStateMeta">stable</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12px;">
+            <div class="ident-key">persistence built</div>
+            <div class="ident-val mono" id="finalPersist">0 / 60 s</div>
+            <div class="ident-key">time in state</div>
+            <div class="ident-val mono" id="finalTimeIn">0.0 s</div>
+            <div class="ident-key">recipient locked</div>
+            <div class="ident-val" id="finalRecipient">—</div>
+            <div class="ident-key">case</div>
+            <div class="ident-val" id="finalCaseStatus">idle</div>
+          </div>
+          <div style="margin-top: 8px;">
+            <div class="small" style="margin-bottom: 4px;">build-up to next promotion</div>
+            <div style="position: relative; height: 14px; border-radius: 7px; background: #0d1218; border: 1px solid #1f3f30; overflow: hidden;">
+              <div id="finalPersistFill" style="position: absolute; top: 0; bottom: 0; left: 0; width: 0%; background: linear-gradient(90deg, #6ee7b7, #fde68a, #ef4444); transition: width .3s;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Identity + Location ── -->
+      <div class="row-2">
+        <div class="card">
+          <h3>User identity</h3>
+          <div class="ident">
+            <div class="avatar" id="avatar">PS</div>
+            <div class="ident-info">
+              <div class="ident-name" id="userName">Priya Singh</div>
+              <div class="ident-sub" id="userSub">28 F · ID #WUALT-3247</div>
+              <div class="ident-grid">
+                <div class="ident-key">Blood type</div><div class="ident-val" id="identBlood">O+</div>
+                <div class="ident-key">Conditions</div><div class="ident-val" id="identConditions">None</div>
+                <div class="ident-key">Context</div><div class="ident-val" id="identContext">Office worker</div>
+                <div class="ident-key">ICE contact</div><div class="ident-val" id="identIce">R. Singh (sister)</div>
+                <div class="ident-key">ICE phone</div><div class="ident-val mono" id="identIcePhone">+91 98••• 11•••</div>
+                <div class="ident-key">Distress window</div><div class="ident-val" id="identDistress">15:05–15:35</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Location</h3>
+          <div class="map">
+            <div class="map-acc"></div>
+            <div class="map-pin"></div>
+          </div>
+          <div class="loc-grid">
+            <div class="ident-key">Coordinates</div>
+            <div class="ident-val mono" id="coords">12.9716, 77.5946</div>
+            <div class="ident-key">Address</div>
+            <div class="ident-val" id="address">MG Road, Bengaluru</div>
+            <div class="ident-key">Accuracy</div>
+            <div class="ident-val" id="accuracy">±8 m</div>
+            <div class="ident-key">Indoor / outdoor</div>
+            <div class="ident-val" id="indoor">Outdoor</div>
+            <div class="ident-key">Last motion (60s)</div>
+            <div class="ident-val" id="motionDesc">Walking, then sudden stop</div>
+            <div class="ident-key">Zone</div>
+            <div class="ident-val" id="zone">Unfamiliar area · 4.2 km from home</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Vitals (energy bars) ── -->
+      <div class="card">
+        <h3>Live physiology</h3>
+        <div class="row-4">
+          <div class="vital">
+            <div class="vital-top">
+              <span class="vital-label">Heart rate</span>
+              <span><span class="vital-value" id="hrVal">132</span><span class="vital-unit">bpm</span></span>
+            </div>
+            <div class="vital-bar"><div class="vital-fill" id="hrFill"></div>
+              <div class="vital-baseline" id="hrBase"></div></div>
+            <div class="vital-ticks"><span>40</span><span>baseline 72</span><span>180</span></div>
+          </div>
+          <div class="vital">
+            <div class="vital-top">
+              <span class="vital-label">HRV / RMSSD</span>
+              <span><span class="vital-value" id="hrvVal">12</span><span class="vital-unit">ms</span></span>
+            </div>
+            <div class="vital-bar"><div class="vital-fill" id="hrvFill"></div>
+              <div class="vital-baseline" id="hrvBase"></div></div>
+            <div class="vital-ticks"><span>0</span><span>baseline 55</span><span>100</span></div>
+          </div>
+          <div class="vital">
+            <div class="vital-top">
+              <span class="vital-label">SpO2</span>
+              <span><span class="vital-value" id="spo2Val">96</span><span class="vital-unit">%</span></span>
+            </div>
+            <div class="vital-bar"><div class="vital-fill" id="spo2Fill"></div>
+              <div class="vital-baseline" id="spo2Base"></div></div>
+            <div class="vital-ticks"><span>85</span><span>baseline 98</span><span>100</span></div>
+          </div>
+          <div class="vital">
+            <div class="vital-top">
+              <span class="vital-label">Skin temp</span>
+              <span><span class="vital-value" id="tempVal">37.3</span><span class="vital-unit">°C</span></span>
+            </div>
+            <div class="vital-bar"><div class="vital-fill" id="tempFill"></div>
+              <div class="vital-baseline" id="tempBase"></div></div>
+            <div class="vital-ticks"><span>33</span><span>baseline 36.6</span><span>40</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Audio + Engine verdict ── -->
+      <div class="row-2">
+        <div class="card">
+          <h3>Audio intelligence</h3>
+          <button class="audio-toggle live" id="audioBtn"><span class="live-dot"></span> LIVE AUDIO LINK</button>
+          <div style="margin-top: 12px;">
+            <div class="small" style="margin-bottom: 5px;">Top detected sounds</div>
+            <div id="audioChips">
+              <span class="sound-chip danger">Scream (0.78)</span>
+              <span class="sound-chip">Speech (0.42)</span>
+              <span class="sound-chip">Traffic (0.31)</span>
+            </div>
+            <div class="danger-score">Audio danger score
+              <div class="vital-bar" style="margin-top: 4px;">
+                <div class="vital-fill danger" id="audioFill" style="width: 78%;"></div>
+              </div>
+            </div>
+            <div class="danger-score">Voice stress
+              <div class="vital-bar" style="margin-top: 4px;">
+                <div class="vital-fill warn" id="voiceFill" style="width: 62%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Engine verdict</h3>
+          <div class="state-pill state-distress" id="statePill">DISTRESS</div>
+          <div class="verdict-meta">
+            <div><span class="small">Confidence</span> <strong id="confVal">0.92</strong></div>
+            <div><span class="small">Severity</span> <strong id="sevVal">0.95</strong></div>
+            <div><span class="small">Trigger</span> <strong id="triggerVal">Manual SOS</strong></div>
+          </div>
+          <!-- Persistence builder — visible only when raw_state differs from final_state -->
+          <div id="persistenceCard" style="margin-top:10px;display:none;padding:8px 10px;border-radius:8px;background:#221a0a;border:1px solid #4a3520;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#fdba74;">
+              <span><strong id="persistenceRaw">distress</strong> raw signal — awaiting confirmation</span>
+              <span class="mono" id="persistenceTime">0.0 / 60s</span>
+            </div>
+            <div style="margin-top:6px;height:6px;background:#0d1218;border-radius:3px;overflow:hidden;">
+              <div id="persistenceFill" style="height:100%;width:0%;background:linear-gradient(90deg,#fde68a,#ef4444);transition:width .3s;"></div>
+            </div>
+            <div class="small" style="margin-top:4px;color:#a89368;">
+              Engine waits 60s of sustained signal before promoting state. This stops single-frame spikes from firing alarms.
+            </div>
+          </div>
+          <div style="margin-top: 10px;">
+            <div class="small">Contributing signals</div>
+            <div id="signalChips">
+              <span class="signal-chip">HR ↑ z=12.0</span>
+              <span class="signal-chip">HRV ↓ z=-5.4</span>
+              <span class="signal-chip">SpO2 ↓ z=-2.5</span>
+              <span class="signal-chip">Temp ↑ z=+4.7</span>
+            </div>
+          </div>
+          <div style="margin-top: 10px;" class="small">
+            Engine reasoning: <span id="reasoning">Multi-channel distress signature corroborated by audio + geo context</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Recipient (replaces tier ladder) ── -->
+      <div class="card">
+        <h3>Who gets notified</h3>
+
+        <!-- Big numeric escalation score + band label -->
+        <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px;">
+          <div>
+            <div class="small">DISTRESS CONFIDENCE</div>
+            <div id="escalConf" style="font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums;">0.000</div>
+          </div>
+          <div style="font-size: 18px; color: #7a8497;">→</div>
+          <div>
+            <div class="small">BAND</div>
+            <div id="escalBand" style="font-size: 18px; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 2px;">ASK USER</div>
+          </div>
+          <div style="flex:1;"></div>
+          <div style="text-align: right;">
+            <div class="small">YOUR THRESHOLDS</div>
+            <div class="small mono" style="color: #fde68a;">contact ≥ <span id="escalCT">0.50</span></div>
+            <div class="small mono" style="color: #fca5a5;">police  ≥ <span id="escalPT">0.85</span></div>
+          </div>
+        </div>
+
+        <!-- Confidence scale 0 → 1 with two threshold marks and current position -->
+        <div style="position: relative; height: 38px; margin: 12px 0 4px;">
+          <div style="position: absolute; top: 14px; left: 0; right: 0; height: 10px;
+                      border-radius: 5px;
+                      background: linear-gradient(90deg, #16291f 0%, #16291f 50%, #2a2716 50%,
+                                                  #2a2716 85%, #2a1818 85%, #2a1818 100%);
+                      border: 1px solid #2c3340;"></div>
+          <!-- threshold marks -->
+          <div id="contactMark" style="position: absolute; top: 6px; bottom: 6px; width: 2px;
+                                       background: #fde68a; transform: translateX(-1px);"></div>
+          <div id="policeMark"  style="position: absolute; top: 6px; bottom: 6px; width: 2px;
+                                       background: #fca5a5; transform: translateX(-1px);"></div>
+          <!-- current confidence indicator -->
+          <div id="confMark" style="position: absolute; top: 0; bottom: 0; width: 14px;
+                                    background: #fff; border-radius: 50%;
+                                    height: 14px; top: 12px;
+                                    box-shadow: 0 0 0 2px #0d0f14, 0 2px 8px rgba(255,255,255,0.35);
+                                    transform: translateX(-7px); transition: left .3s;"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 11px; color: #7a8497;">
+          <div>0 — silent</div>
+          <div style="text-align:center;">contact threshold</div>
+          <div style="text-align:right;">police threshold</div>
+        </div>
+
+        <!-- Currently-selected recipient card -->
+        <div id="recipientBox" style="margin-top: 14px; padding: 12px 14px;
+                                      border-radius: 8px; background: #1a1e27;
+                                      border: 1px solid #2c3340;">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a8497;">
+            CURRENT RECIPIENT
+          </div>
+          <div id="recipientLabel" style="font-size:18px;font-weight:700;margin-top:4px;">
+            R. Singh (sister)
+          </div>
+          <div id="recipientDetail" class="small" style="margin-top:2px;">
+            SMS + voice call + live audio link · dispatching in 28 s
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Event timeline ── -->
+      <div class="card">
+        <h3>Event timeline</h3>
+        <div class="timeline" id="timeline"></div>
+      </div>
+
+      <!-- ── Action bar ── -->
+      <div class="card">
+        <h3>Responder actions</h3>
+        <div class="actions">
+          <button class="action" onclick="logEvent('action_call', 'Responder: dialled user')">Call user</button>
+          <button class="action escalate" onclick="logEvent('action_escalate', 'Responder: bumped to police-level recipient')">Bump to police</button>
+          <button class="action dispatch" onclick="logEvent('action_dispatch', 'Responder: DISPATCHED ambulance to user location')">Dispatch ambulance</button>
+          <button class="action resolve" onclick="attemptCancel()">Mark resolved (PIN)</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════ SIMULATOR PANEL ═══════════ -->
+  <div class="sim stack">
+
+    <div class="card">
+      <h3>Engine connection</h3>
+      <div class="ctl-grid">
+        <div class="ctl">
+          <label>Status</label>
+          <div id="engineStatus" style="padding:6px 10px;border-radius:6px;background:#1f2530;font-size:12px;">connecting…</div>
+        </div>
+        <div class="ctl">
+          <label>Mode</label>
+          <div id="engineMode" style="padding:6px 10px;border-radius:6px;background:#1f2530;font-size:12px;">—</div>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="card">
+      <h3>One subject · one day</h3>
+      <p class="small" style="margin-top:0;">
+        Stream auto-runs. Normal mode aggregates 1 subject-minute every 10 real-sec.
+        Hit SOS to feed the engine 60 high-fidelity 1-Hz frames.
+      </p>
+      <label class="small" style="display:block;color:#7a8497;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-top:8px;">Subject (5)</label>
+      <select id="subjectPicker" style="width:100%;background:#0d1218;color:#e8ecf1;border:1px solid #2c3340;padding:7px 10px;border-radius:5px;font:inherit;font-size:13px;margin-top:3px;">
+        <option>(loading subjects…)</option>
+      </select>
+      <div class="small" id="subjectMeta" style="margin-top:4px;color:#a89368;">—</div>
+      <div class="ctl-grid">
+        <div class="ctl">
+          <label>Start at minute</label>
+          <input id="dayStart" type="number" step="1" min="0" max="1439" value="780">
+        </div>
+        <div class="ctl">
+          <label>Stream mode</label>
+          <div id="streamMode" style="padding:6px 10px;border-radius:6px;background:#1f2530;font-size:12px;color:#fde68a;font-weight:700;">AGGREGATED · 1 min/10 s</div>
+        </div>
+      </div>
+      <div class="sim-actions" style="margin-top:8px;">
+        <button id="dayPlayBtn"  onclick="playDay()">▶ Play</button>
+        <button id="dayPauseBtn" onclick="pauseDay()" disabled>⏸ Pause</button>
+        <button id="dayResetBtn" onclick="resetDay()">↺ Reset</button>
+      </div>
+      <div id="dayTime" style="margin-top:8px;font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;color:#fde68a;">—:—</div>
+      <div class="small" id="dayInfo" style="margin-top:2px;">subject: Priya Singh · 28 F · ID #WUALT-3247</div>
+      <div class="small" id="dayLabel" style="margin-top:6px;color:#a89368;">—</div>
+
+      <!-- Quick-jump buttons — populated per subject by updateJumpButtons() -->
+      <p class="small" style="margin-top:14px;margin-bottom:6px;color:#7a8497;text-transform:uppercase;letter-spacing:1px;font-weight:700;">jump to:</p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">
+        <button id="jumpStress"
+                onclick="jumpToBtn('stress')"
+                style="padding:8px 4px;border-radius:6px;border:1px solid #5a4520;background:#2a2716;color:#fde68a;cursor:pointer;font-size:11px;font-weight:600;">
+          STRESS<br><span id="jumpStressLabel" style="font-weight:400;font-size:10px;">—</span>
+        </button>
+        <button id="jumpDistress"
+                onclick="jumpToBtn('distress')"
+                style="padding:8px 4px;border-radius:6px;border:1px solid #5a2424;background:#2a1818;color:#fca5a5;cursor:pointer;font-size:11px;font-weight:600;">
+          DISTRESS<br><span id="jumpDistressLabel" style="font-weight:400;font-size:10px;">—</span>
+        </button>
+      </div>
+      <p class="small" style="margin-top:8px;color:#7a8497;font-style:italic;">
+        After jumping, hit 🆘 PRESS SOS to feed the engine 60 s of that moment's data.
+      </p>
+    </div>
+
+    <!-- Wearer's SOS button — explicit, prominent -->
+    <div class="card" style="border-color:#5a2424;background:linear-gradient(180deg,#221010,#0d0f14);">
+      <h3 style="color:#fca5a5;">Wearer SOS</h3>
+      <p class="small" style="margin-top:0;color:#fdba74;">
+        The wearer presses this button on their ring at any moment.
+        Stream switches to 1 Hz; engine ingests the next 60 frames; cascade fires based on what the engine sees.
+      </p>
+      <button id="bigSosBtn" onclick="pressBigSos()" style="width:100%;padding:18px;border-radius:10px;border:0;background:linear-gradient(180deg,#ef4444,#b91c1c);color:white;font-size:18px;font-weight:800;letter-spacing:1px;cursor:pointer;box-shadow:0 4px 14px rgba(239,68,68,0.35);">
+        🆘 PRESS SOS
+      </button>
+      <div class="small" id="sosBurstStatus" style="margin-top:8px;text-align:center;color:#a89368;">idle</div>
+    </div>
+
+    <div class="card">
+      <h3>Trigger source</h3>
+      <p class="small" style="margin-top:0;">What kind of event raised the case. The engine doesn't predict this — the device does.</p>
+      <select id="trigSource">
+        <option value="manual_sos">Manual SOS (button pressed)</option>
+        <option value="auto_distress">Auto — engine flagged distress</option>
+        <option value="fall">Auto — fall confirmed</option>
+        <option value="audio">Auto — scream detected</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h3>Sensor inputs <span class="small" style="text-transform:none;letter-spacing:0;font-weight:400;">— what the engine classifies on</span></h3>
+      <div class="ctl-grid">
+        <div class="ctl"><label>HR (bpm)</label><input id="hr" type="number" step="1" value="132"></div>
+        <div class="ctl"><label>HRV (ms)</label><input id="hrv" type="number" step="1" value="12"></div>
+        <div class="ctl"><label>SpO2 (%)</label><input id="spo2" type="number" step="0.1" value="96"></div>
+        <div class="ctl"><label>Skin temp (°C)</label><input id="temp" type="number" step="0.1" value="37.3"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Audio</h3>
+      <div class="ctl-grid">
+        <div class="ctl">
+          <label>Top sound</label>
+          <select id="audioSound">
+            <option value="silence">silence</option>
+            <option value="speech">speech</option>
+            <option value="scream" selected>scream</option>
+            <option value="gunshot">gunshot</option>
+            <option value="explosion">explosion</option>
+            <option value="music">music</option>
+            <option value="traffic">traffic</option>
+          </select>
+        </div>
+        <div class="ctl"><label>Danger score (0–1)</label><input id="audioDanger" type="number" step="0.01" min="0" max="1" value="0.78"></div>
+        <div class="ctl"><label>Voice stress</label><input id="voiceStress" type="number" step="0.01" min="0" max="1" value="0.62"></div>
+        <div class="ctl">
+          <label>Audio live?</label>
+          <select id="audioLive">
+            <option value="yes" selected>yes</option><option value="no">no</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>User-configured thresholds <span class="small" style="text-transform:none;letter-spacing:0;font-weight:400;">— set in onboarding</span></h3>
+      <p class="small" style="margin-top:0;">Confidence below contact = silent. Between contact and police = the user's contact is dialled. Above police = emergency services.</p>
+      <div class="ctl-grid">
+        <div class="ctl">
+          <label>Contact threshold</label>
+          <input id="contactThreshold" type="range" min="0" max="1" step="0.01" value="0.50">
+          <div class="small" style="text-align:right;font-variant-numeric:tabular-nums;" id="contactThresholdLabel">0.50</div>
+        </div>
+        <div class="ctl">
+          <label>Police threshold</label>
+          <input id="policeThreshold" type="range" min="0" max="1" step="0.01" value="0.85">
+          <div class="small" style="text-align:right;font-variant-numeric:tabular-nums;" id="policeThresholdLabel">0.85</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Geospatial</h3>
+      <div class="toggle-grid">
+        <label><input type="checkbox" id="isHome">      home zone</label>
+        <label><input type="checkbox" id="isWork">      work zone</label>
+        <label><input type="checkbox" id="isKnown">     known area</label>
+        <label><input type="checkbox" id="isUnknown" checked> unfamiliar area</label>
+        <label><input type="checkbox" id="isNight" checked>   night</label>
+        <label><input type="checkbox" id="isWalking" checked> walking</label>
+      </div>
+      <div class="ctl-grid" style="margin-top: 8px;">
+        <div class="ctl"><label>Distance from home (km)</label><input id="distKm" type="number" step="0.1" value="4.2"></div>
+        <div class="ctl"><label>Hour of day</label><input id="hourOfDay" type="number" min="0" max="23" value="1"></div>
+      </div>
+    </div>
+
+
+    <div class="card">
+      <h3>Run / clear</h3>
+      <div class="sim-actions">
+        <button class="sim-press" onclick="press()">PRESS SOS</button>
+        <button class="sim-reset" onclick="resetAll()">Reset</button>
+        <button onclick="resolveCase()">Resolve</button>
+      </div>
+      <div class="sim-actions" style="margin-top: 6px;">
+        <button onclick="resetEngineAccumulator()" style="grid-column: span 3; background: #2a1818; border-color: #5a2424; color: #fca5a5;">⟲ Clear engine persistence accumulator</button>
+      </div>
+      <p class="small" style="margin-top: 6px;">"Reset" clears the case timer. "Clear engine persistence" wipes the 60-second accumulator on the backend — use between scenarios so the new run starts from 0/60s.</p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Backend connection ────────────────────────────── */
+// API URL comes from ?api=... query param, else localhost:8766 default.
+// If the engine is reachable, the dashboard uses the real model.
+// If not, it falls back to the mock JS computation so the page still works on Netlify.
+// Backend default — Render-hosted engine. Override locally with ?api=http://localhost:8766
+const DEFAULT_API = "https://wualt-engine-vs7l.onrender.com";
+const API = (new URLSearchParams(location.search).get("api") || DEFAULT_API).replace(/\/+$/, "");
+let LIVE = false;   // true once we've confirmed the engine is reachable
+
+async function probeEngine() {
+  try {
+    const r = await fetch(API + "/health", { method: "GET" });
+    if (r.ok) {
+      LIVE = true;
+      document.getElementById("engineStatus").innerHTML = '<span style="color:#6ee7b7;">● connected</span>';
+      document.getElementById("engineMode").innerHTML   = '<span style="color:#6ee7b7;">live engine</span>';
+      return true;
+    }
+  } catch (e) { /* fall through */ }
+  document.getElementById("engineStatus").innerHTML = '<span style="color:#fde68a;">● mock fallback</span>';
+  document.getElementById("engineMode").innerHTML   = '<span style="color:#fde68a;">no backend</span>';
+  return false;
+}
+
+async function classifyOnBackend(payload) {
+  if (!LIVE) return null;
+  try {
+    const r = await fetch(API + "/classify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
+}
+
+/* ── One subject · one day — dual-mode stream ───────────────
+ *
+ *  AGGREGATED mode (default):
+ *    1 frame per 10 real seconds. Each frame is one full subject-minute.
+ *    Engine sees a calm summary. No persistence build-up.
+ *
+ *  BURST mode (after SOS):
+ *    1 frame per real second. 60 frames synthesised from the SOS-time
+ *    minute's profile with realistic jitter, so persistence accumulates
+ *    over 60 real wall-clock seconds.
+ *
+ *  POST-BURST behaviour (after the 60-frame burst completes):
+ *    - If final state = distress → stay at 1 Hz until "Mark resolved"
+ *    - Otherwise → return to AGGREGATED mode
+ *
+ *  Cancel during distress requires PIN 1234.
+ *    Wrong PIN (or 3 attempts) = duress, silent continue.
+ * ─────────────────────────────────────────────────────────────── */
+
+let DAY = null;
+let dayIdx = 0;
+let dayTimer = null;
+let streamMode = "AGGREGATED";          // AGGREGATED | BURST | POST_DISTRESS
+let burstFramesLeft = 0;
+let burstStartIdx = 0;
+let burstFinalState = null;             // captured after burst finishes
+
+const AGG_INTERVAL_MS  = 10000;         // 1 min subject-time per 10 real-sec
+const BURST_INTERVAL_MS = 1000;         // 1 frame per 1 real-sec
+
+let SUBJECTS_INDEX = [];
+
+// Per-subject demographic detail. Synthetic — purely for the demo identity card.
+const SUBJECT_DETAILS = {
+  S01: {avatar: "PS", blood: "O+", conditions: "None",                              ice: "R. Singh (sister)",    phone: "+91 98••• 11•••"},
+  S02: {avatar: "LR", blood: "B+", conditions: "Hypertension (controlled)",         ice: "R. Reddy (husband)",   phone: "+91 89••• 22•••"},
+  S03: {avatar: "MI", blood: "A+", conditions: "Mild cardiac · daily meds",         ice: "S. Iyer (daughter)",   phone: "+91 99••• 33•••"},
+  S04: {avatar: "VI", blood: "AB+",conditions: "Anxiety disorder · under treatment",ice: "K. Iyengar (husband)", phone: "+91 98••• 44•••"},
+  S05: {avatar: "SR", blood: "B+", conditions: "None · daily yoga + meditation",   ice: "M. Rao (husband)",     phone: "+91 90••• 55•••"},
+};
+
+async function loadSubjectList() {
+  if (!LIVE) return;
+  try {
+    const r = await fetch(API + "/subjects");
+    const d = await r.json();
+    SUBJECTS_INDEX = d.subjects || [];
+    const sel = document.getElementById("subjectPicker");
+    sel.innerHTML = "";
+    SUBJECTS_INDEX.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = `${s.id} — ${s.name} (${s.age}${s.sex}) · ${s.context}`;
+      sel.appendChild(opt);
+    });
+    sel.value = "S01";
+    sel.addEventListener("change", () => { switchSubject(sel.value); });
+  } catch (e) { /* fall through */ }
+}
+
+let _subjectRequestSeq = 0;
+async function switchSubject(sid) {
+  if (!LIVE) return;
+  const mySeq = ++_subjectRequestSeq;
+  pauseDay();
+  await resetEngineAccumulator();
+  if (caseActive) resolveCase();
+  try {
+    const r = await fetch(API + "/subject/" + encodeURIComponent(sid));
+    if (mySeq !== _subjectRequestSeq) return;   // stale — newer call superseded
+    if (!r.ok) return;
+    const data = await r.json();
+    if (mySeq !== _subjectRequestSeq) return;
+    DAY = data;
+    applySubjectIdentity(DAY.profile);
+    updateSubjectMeta(DAY);
+    updateJumpButtons(sid);
+    logEvent("subject_switch", `Loaded subject ${sid} — ${DAY.profile.name}`);
+    dayIdx = pickDefaultStartForSubject(sid);
+    document.getElementById("dayStart").value = dayIdx;
+    setStreamMode("AGGREGATED");
+    burstFramesLeft = 0;
+    tickDay();
+    scheduleNextTick();
+  } catch (e) {}
+}
+
+function applySubjectIdentity(p) {
+  const d = SUBJECT_DETAILS[p.id] || {};
+  document.getElementById("avatar").textContent  = d.avatar || (p.name.split(" ").map(s => s[0]).join("").slice(0,2));
+  document.getElementById("userName").textContent = p.name;
+  document.getElementById("userSub").textContent  = `${p.age} ${p.sex} · ID #WUALT-${p.id}`;
+  document.getElementById("identBlood").textContent      = d.blood || "—";
+  document.getElementById("identConditions").textContent = d.conditions || "None";
+  document.getElementById("identContext").textContent    = p.context || "—";
+  document.getElementById("identIce").textContent        = d.ice || "Emergency contact";
+  document.getElementById("identIcePhone").textContent   = d.phone || "—";
+  // Update the day-stream card's identity line too
+  const di = document.getElementById("dayInfo");
+  if (di) di.textContent = `subject: ${p.name} · ${p.age} ${p.sex} · ID #WUALT-${p.id}`;
+}
+
+function updateSubjectMeta(day) {
+  const m = document.getElementById("subjectMeta");
+  if (!m) return;
+  m.innerHTML = `★ DISTRESS @ <strong>${day.distress_window}</strong> — ${day.distress_label}`;
+  // Update identity card's distress hint as well
+  const distEl = document.getElementById("identDistress");
+  if (distEl) distEl.textContent = day.distress_window;
+}
+
+/* For each subject, pick a starting minute that's a few minutes before
+   their distress window — so the boss only has to wait a short while. */
+function pickDefaultStartForSubject(sid) {
+  return ({
+    S01: 870,    // 14:30 — meeting stress, distress comes at 15:05
+    S02: 260,    // 04:20 — driving, distress at 04:33
+    S03: 1150,   // 19:10 — cooking, fall at 19:20
+    S04: 565,    // 09:25 — pre-pitch, panic at 09:35
+    S05: 510,    // 08:30 — mid-yoga-class, demonstrates motion suppression (HR up but state normal)
+  })[sid] || 780;
+}
+
+/* Per-subject jump targets — set so STRESS and DISTRESS are at different
+   times per individual (matches the data in subjects/*.json). */
+const JUMP_TABLE = {
+  S01: { stress: {min: 870,  label: "14:30 · meeting"},          distress: {min: 910,  label: "15:10 · parking lot"} },
+  S02: { stress: {min: 1050, label: "17:30 · employer"},         distress: {min: 273,  label: "04:33 · followed"} },
+  S03: { stress: {min: 630,  label: "10:30 · grief"},            distress: {min: 1165, label: "19:25 · fall"} },
+  S04: { stress: {min: 1050, label: "17:30 · anxiety"},          distress: {min: 577,  label: "09:37 · panic"} },
+  S05: { stress: {min: 935,  label: "15:35 · team call"},        distress: null },   // no distress in this day
+};
+
+function jumpToBtn(kind) {
+  const sid = DAY?.profile?.id;
+  if (!sid) return;
+  const t = (JUMP_TABLE[sid] || {})[kind];
+  if (!t) {
+    logEvent("jump_unavailable", `${kind.toUpperCase()} not in this subject's day`);
+    return;
+  }
+  jumpTo(t.min, `${kind.toUpperCase()} @ ${t.label}`);
+}
+
+function updateJumpButtons(sid) {
+  const e = JUMP_TABLE[sid] || {};
+  const sLbl = document.getElementById("jumpStressLabel");
+  const dLbl = document.getElementById("jumpDistressLabel");
+  const sBtn = document.getElementById("jumpStress");
+  const dBtn = document.getElementById("jumpDistress");
+  if (e.stress) {
+    sLbl.textContent = e.stress.label;
+    sBtn.disabled = false; sBtn.style.opacity = "1"; sBtn.style.cursor = "pointer";
+  } else {
+    sLbl.textContent = "— (none in this day)";
+    sBtn.disabled = true;  sBtn.style.opacity = "0.4"; sBtn.style.cursor = "not-allowed";
+  }
+  if (e.distress) {
+    dLbl.textContent = e.distress.label;
+    dBtn.disabled = false; dBtn.style.opacity = "1"; dBtn.style.cursor = "pointer";
+  } else {
+    dLbl.textContent = "— (calm baseline · no event)";
+    dBtn.disabled = true;  dBtn.style.opacity = "0.4"; dBtn.style.cursor = "not-allowed";
+  }
+}
+
+// Backward-compat — old call site still uses loadSubjectDay()
+async function loadSubjectDay() {
+  await loadSubjectList();
+  if (SUBJECTS_INDEX.length) await switchSubject("S01");
+}
+
+async function jumpTo(minute, label) {
+  if (!DAY) await loadSubjectDay();
+  if (!DAY) return;
+  // Reset engine + case so we get a clean burst window
+  await resetEngineAccumulator();
+  if (caseActive) resolveCase();
+  pauseDay();
+  burstFramesLeft = 0;
+  setStreamMode("AGGREGATED");
+  dayIdx = Math.max(0, Math.min(DAY.frames.length - 1, minute));
+  document.getElementById("dayStart").value = minute;
+  // Push a single frame so the dashboard reflects the new moment immediately
+  tickDay();
+  scheduleNextTick();
+  document.getElementById("dayPlayBtn").disabled  = true;
+  document.getElementById("dayPauseBtn").disabled = false;
+  logEvent("jump", `Jumped to ${DAY.frames[minute].time} for ${label}`);
+}
+
+async function playDay() {
+  if (!LIVE) { alert("Connect to the backend first."); return; }
+  if (!DAY) await loadSubjectDay();
+  if (!DAY) return;
+  dayIdx = Math.max(0, Math.min(DAY.frames.length - 1,
+                                parseInt(document.getElementById("dayStart").value) || 0));
+  document.getElementById("dayPlayBtn").disabled  = true;
+  document.getElementById("dayPauseBtn").disabled = false;
+  setStreamMode("AGGREGATED");
+  logEvent("day_start", `Stream started at ${DAY.frames[dayIdx].time}`);
+  tickDay();
+  scheduleNextTick();
+}
+
+function pauseDay() {
+  if (dayTimer) { clearTimeout(dayTimer); dayTimer = null; }
+  document.getElementById("dayPlayBtn").disabled  = false;
+  document.getElementById("dayPauseBtn").disabled = true;
+  if (DAY) logEvent("day_pause", `Paused at ${DAY.frames[Math.max(0,dayIdx-1)]?.time || "—"}`);
+}
+
+function resetDay() {
+  pauseDay();
+  dayIdx = parseInt(document.getElementById("dayStart").value) || 0;
+  setStreamMode("AGGREGATED");
+  burstFramesLeft = 0;
+  if (DAY) {
+    document.getElementById("dayTime").textContent = "—:—";
+    document.getElementById("dayLabel").textContent = "—";
+    logEvent("day_reset", "Day stream reset");
+  }
+}
+
+function setStreamMode(mode) {
+  streamMode = mode;
+  const el = document.getElementById("streamMode");
+  if (mode === "AGGREGATED") {
+    el.style.color = "#fde68a";
+    el.style.background = "#1f2530";
+    el.textContent = "AGGREGATED · 1 min/10 s";
+  } else if (mode === "BURST") {
+    el.style.color = "#fca5a5";
+    el.style.background = "#2a1818";
+    el.textContent = "BURST · 1 frame/sec";
+  } else {
+    el.style.color = "#fca5a5";
+    el.style.background = "#2a1818";
+    el.textContent = "POST-DISTRESS · 1 Hz live";
+  }
+}
+
+function scheduleNextTick() {
+  if (dayTimer) clearTimeout(dayTimer);
+  const ms = (streamMode === "AGGREGATED") ? AGG_INTERVAL_MS : BURST_INTERVAL_MS;
+  dayTimer = setTimeout(() => { tickDay(); scheduleNextTick(); }, ms);
+}
+
+function tickDay() {
+  if (!DAY || dayIdx >= DAY.frames.length) { pauseDay(); return; }
+  const f = DAY.frames[dayIdx++];
+  pushFrameToForm(f);
+
+  // BURST mode: count down toward the engine's commit
+  if (streamMode === "BURST") {
+    burstFramesLeft--;
+    document.getElementById("sosBurstStatus").textContent =
+      `streaming burst · ${60 - burstFramesLeft}/60 frames`;
+    if (burstFramesLeft <= 0) finishBurst();
+  }
+
+  // Fall event marker
+  if (f.fall_event) {
+    logEvent("fall_detected", `★ FALL detected at ${f.time} (acc_mag ${f.acc_mag} g)`);
+  }
+  // Distress entry log (aggregated mode only — burst mode logs differently)
+  if (streamMode === "AGGREGATED"
+      && f.expected_state === "distress"
+      && DAY.frames[dayIdx - 2]?.expected_state !== "distress") {
+    logEvent("event_distress", `★ DISTRESS condition begins at ${f.time}`);
+  }
+
+  document.getElementById("dayTime").textContent  = f.time;
+  document.getElementById("dayLabel").textContent = f.label;
+
+  syncDashboard();
+}
+
+/* ── Burst synthesis — generate 60 1-sec frames around the SOS minute ── */
+function buildBurstFrames(baseFrame) {
+  const out = [];
+  for (let i = 0; i < 60; i++) {
+    out.push({
+      ...baseFrame,
+      hr:   baseFrame.hr  + (Math.random() - 0.5) * 4,
+      hrv:  Math.max(2, baseFrame.hrv + (Math.random() - 0.5) * 4),
+      spo2: baseFrame.spo2 + (Math.random() - 0.5) * 0.5,
+      temp: baseFrame.temp + (Math.random() - 0.5) * 0.05,
+      time: baseFrame.time + ` :${String(i).padStart(2,'0')}s`,
+      label: `(burst frame ${i+1}/60) ${baseFrame.label}`,
+    });
+  }
+  return out;
+}
+
+async function pressBigSos() {
+  if (!DAY) return;
+  if (streamMode === "BURST") {
+    alert("Already streaming SOS burst.");
+    return;
+  }
+  // Capture current minute's profile and replace upcoming frames with the burst
+  const baseFrame = DAY.frames[Math.max(0, dayIdx - 1)];
+  const burst = buildBurstFrames(baseFrame);
+  // Splice the burst into the day frames at the current index
+  DAY.frames.splice(dayIdx, 0, ...burst);
+  burstFramesLeft = 60;
+  burstStartIdx = dayIdx;
+  setStreamMode("BURST");
+
+  // Reset the engine's persistence accumulator so the burst is a clean window
+  await resetEngineAccumulator();
+
+  // Open a case on the dashboard
+  press();                              // existing function — sets caseActive
+  logEvent("sos_press", `🆘 SOS pressed at ${baseFrame.time} — 60-frame burst starting`);
+  document.getElementById("sosBurstStatus").textContent = "streaming burst · 1/60 frames";
+
+  // Re-pace the stream — switch to 1Hz immediately
+  scheduleNextTick();
+}
+
+function finishBurst() {
+  // Engine's lastEngineState after 60 wall-seconds of distress will have promoted
+  burstFinalState = lastEngineState;
+  logEvent("burst_done", `Burst complete — engine committed to state: ${burstFinalState.toUpperCase()}`);
+  document.getElementById("sosBurstStatus").textContent =
+    `burst done — final state: ${burstFinalState.toUpperCase()}`;
+
+  // Guard against re-entry — tickDay keeps decrementing burstFramesLeft
+  // and would call finishBurst again every second otherwise.
+  burstFramesLeft = -9999;
+
+  if (burstFinalState === "distress") {
+    setStreamMode("POST_DISTRESS");
+    logEvent("post_distress", "Stream staying at 1 Hz until Mark resolved (or 2 h subject time)");
+  } else if (burstFinalState === "normal") {
+    setStreamMode("AGGREGATED");                // stops new bursts; stream returns to slow tick
+    if (!document.getElementById("confirmOverlay")) {   // open the modal once only
+      showConfirmationModal();
+      logEvent("ask_user", "Engine says NORMAL after burst — asking the user to confirm (60s window)");
+    }
+  } else if (burstFinalState === "stress") {
+    // Per cascade spec §6: stress final → contact, 30s 1-click cancel
+    setStreamMode("AGGREGATED");
+    forceContactRecipient();
+    logEvent("contact_silent", "Engine says STRESS — contact (R. Singh) being notified · 30s grace");
+    showStressContactBanner();
+  } else {
+    setStreamMode("AGGREGATED");
+    setTimeout(() => { if (caseActive) resolveCase(); }, 800);
+  }
+}
+
+/* ── Stress final = silent contact notification with 30s grace ── */
+function forceContactRecipient() {
+  const lbl = document.getElementById("recipientLabel");
+  const det = document.getElementById("recipientDetail");
+  const box = document.getElementById("recipientBox");
+  const bnd = document.getElementById("escalBand");
+  if (lbl) lbl.textContent = (SUBJECT_DETAILS[DAY?.profile?.id || "S01"] || {}).ice || "R. Singh (sister)";
+  if (det) det.textContent = "Silent SMS + voice call · 30 s grace, 1-click cancel.";
+  if (box) { box.style.background = "#221a0a"; box.style.borderColor = "#5a4520"; }
+  if (bnd) { bnd.textContent = "CONTACT"; bnd.style.background = "#2a2716"; bnd.style.color = "#fde68a"; bnd.style.border = "1px solid #5a4520"; }
+}
+
+let stressCancelTimer = null;
+function showStressContactBanner() {
+  const overlay = document.createElement("div");
+  overlay.id = "stressOverlay";
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9997;`;
+  overlay.innerHTML = `
+    <div style="background:#161a22;border:2px solid #5a4520;border-radius:12px;padding:24px;max-width:400px;text-align:center;">
+      <h2 style="margin:0 0 8px;color:#fde68a;font-size:18px;letter-spacing:1px;">STRESS DETECTED</h2>
+      <p style="font-size:13px;color:#a89368;margin:0 0 14px;">
+        Engine committed to STRESS. Notifying R. Singh (sister) silently in:
+      </p>
+      <div id="stressCountdown" style="font-size:42px;font-weight:800;color:#fde68a;font-variant-numeric:tabular-nums;">30</div>
+      <div class="small" style="color:#a89368;margin-bottom:14px;">seconds — tap to cancel before sending</div>
+      <button onclick="cancelStress()" style="width:100%;padding:11px;border:1px solid #2c3340;border-radius:8px;background:#1d222c;color:#e8ecf1;cursor:pointer;font-weight:600;">Cancel — I'm fine</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  let n = 30;
+  stressCancelTimer = setInterval(() => {
+    n--;
+    document.getElementById("stressCountdown") && (document.getElementById("stressCountdown").textContent = n);
+    if (n <= 0) {
+      clearInterval(stressCancelTimer);
+      stressCancelTimer = null;
+      document.getElementById("stressOverlay")?.remove();
+      logEvent("contact_sent", "Contact dialled — SMS sent + voice call placed");
+      setTimeout(() => { if (caseActive) resolveCase(); }, 600);
+    }
+  }, 1000);
+}
+
+function cancelStress() {
+  if (stressCancelTimer) { clearInterval(stressCancelTimer); stressCancelTimer = null; }
+  document.getElementById("stressOverlay")?.remove();
+  logEvent("user_cancelled_stress", "User cancelled stress notification within 30s grace");
+  resolveCase();
+}
+
+/* ── ASK_USER modal — engine NORMAL but wearer pressed SOS ── */
+let confirmTimer = null;
+let confirmDeadline = 0;
+function showConfirmationModal() {
+  confirmDeadline = Date.now() + 60_000;
+  const overlay = document.createElement("div");
+  overlay.id = "confirmOverlay";
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9998;`;
+  overlay.innerHTML = `
+    <div style="background:#161a22;border:2px solid #1f3f30;border-radius:14px;padding:28px;max-width:440px;text-align:center;">
+      <h2 style="margin:0 0 8px;color:#6ee7b7;font-size:20px;letter-spacing:1px;">EVERYTHING OK?</h2>
+      <p style="font-size:13px;color:#a89368;margin:0 0 18px;">
+        We saw you press SOS but your vitals look calm. If you're safe, dismiss this. Otherwise we'll send help.
+      </p>
+
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:16px;">
+        <button onclick="confirmSafe()" style="padding:12px 22px;border:0;border-radius:8px;background:linear-gradient(180deg,#34d399,#10b981);color:white;cursor:pointer;font-weight:700;font-size:14px;">✓ I'm safe</button>
+        <button onclick="confirmHelp()" style="padding:12px 22px;border:0;border-radius:8px;background:linear-gradient(180deg,#ef4444,#b91c1c);color:white;cursor:pointer;font-weight:700;font-size:14px;">! Send help</button>
+      </div>
+
+      <div style="background:#0d1218;border:1px solid #4a3520;border-radius:8px;padding:10px;">
+        <div class="small" style="color:#fdba74;margin-bottom:6px;">
+          If you don't respond, R. Singh (sister) will be called automatically:
+        </div>
+        <div id="confirmCountdown" style="font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;color:#fde68a;">60</div>
+        <div class="small" style="color:#a89368;">seconds remaining</div>
+        <div style="margin-top:8px;height:6px;border-radius:3px;background:#1f2530;overflow:hidden;">
+          <div id="confirmBar" style="height:100%;width:100%;background:linear-gradient(90deg,#6ee7b7,#fde68a,#ef4444);transition:width 1s linear;"></div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Tick the countdown once per second
+  confirmTimer = setInterval(() => {
+    const remaining = Math.max(0, (confirmDeadline - Date.now()) / 1000);
+    const cd = document.getElementById("confirmCountdown");
+    const bar = document.getElementById("confirmBar");
+    if (cd)  cd.textContent = remaining.toFixed(0);
+    if (bar) bar.style.width = (remaining / 60 * 100) + "%";
+    if (remaining <= 0) confirmTimeout();
+  }, 250);
+}
+
+function closeConfirmModal() {
+  if (confirmTimer) { clearInterval(confirmTimer); confirmTimer = null; }
+  document.getElementById("confirmOverlay")?.remove();
+}
+
+function confirmSafe() {
+  closeConfirmModal();
+  logEvent("user_safe", "User confirmed safe — case resolved");
+  setStreamMode("AGGREGATED");
+  resolveCase();
+}
+
+function confirmHelp() {
+  closeConfirmModal();
+  logEvent("user_help", "User confirmed help needed — escalating directly to emergency contact");
+  escalateToContact("user requested help via confirm modal");
+}
+
+function confirmTimeout() {
+  closeConfirmModal();
+  logEvent("silence_escalate", "★ 60-second silence — escalating to emergency contact (R. Singh)");
+  escalateToContact("60-second silence treated as inability to respond");
+}
+
+function escalateToContact(reason) {
+  // Pin the recipient card visually + keep the case active at 1 Hz
+  setStreamMode("POST_DISTRESS");
+  // Update the recipient detail UI to show the contact has been notified
+  const det = document.getElementById("recipientDetail");
+  if (det) det.textContent = `★ Contact dialled — ${reason}. SMS + live audio link active.`;
+  const box = document.getElementById("recipientBox");
+  if (box) {
+    box.style.background  = "#221a0a";
+    box.style.borderColor = "#5a4520";
+  }
+  logEvent("contact_dialled", "R. Singh (sister) notified · live audio link active");
+}
+
+/* ── Push one frame's values into the simulator form ── */
+function pushFrameToForm(f) {
+  document.getElementById("hr").value          = f.hr.toFixed(1);
+  document.getElementById("hrv").value         = f.hrv.toFixed(1);
+  document.getElementById("spo2").value        = f.spo2.toFixed(1);
+  document.getElementById("temp").value        = f.temp.toFixed(2);
+
+  document.getElementById("audioSound").value  = f.audio_class === "thud" ? "speech" : f.audio_class;
+  document.getElementById("audioDanger").value = f.audio_danger.toFixed(2);
+  document.getElementById("audioLive").value   = f.audio_danger > 0.20 ? "yes" : "no";
+
+  ["isHome","isWork","isKnown","isUnknown"].forEach(k => $(k).checked = false);
+  if (f.geo_zone === "home")        $("isHome").checked = true;
+  else if (f.geo_zone === "work")   $("isWork").checked = true;
+  else if (f.geo_zone === "known")  $("isKnown").checked = true;
+  else                               $("isUnknown").checked = true;
+  $("isNight").checked   = f.is_night;
+  $("isWalking").checked = (f.motion === "walking" || f.motion === "exercise");
+  $("hourOfDay").value   = parseInt(f.time.split(":")[0]);
+}
+
+/* ── PIN-protected cancellation (Q3) ───────────────────────── */
+let pinDispatchTimer = null;
+let pinCountdownTimer = null;
+
+function showPinModal() {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999;`;
+  overlay.innerHTML = `
+    <div style="background:#161a22;border:2px solid #5a2424;border-radius:12px;padding:24px;max-width:400px;text-align:center;">
+      <h2 style="margin:0 0 10px;color:#fca5a5;font-size:18px;letter-spacing:1px;">CANCEL ACTIVE DISTRESS SOS</h2>
+      <p style="font-size:13px;color:#a89368;margin:0 0 12px;">Enter your 4-digit PIN to cancel. Wrong PIN ×3 = duress assumed; engine continues silently.</p>
+
+      <div style="background:#2a1818;border:1px solid #5a2424;border-radius:8px;padding:8px;margin-bottom:14px;">
+        <div class="small" style="color:#fca5a5;margin-bottom:4px;">If you don't enter your PIN, emergency services will be dialled in:</div>
+        <div id="pinCountdown" style="font-size:30px;font-weight:800;color:#fca5a5;font-variant-numeric:tabular-nums;">15</div>
+        <div class="small" style="color:#fdba74;">seconds</div>
+      </div>
+
+      <input id="pinInput" type="password" inputmode="numeric" maxlength="4"
+             style="width:160px;padding:10px;text-align:center;font-size:24px;letter-spacing:8px;background:#0d1218;color:#e8ecf1;border:1px solid #2c3340;border-radius:8px;font:inherit;font-weight:700;" />
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+        <button onclick="submitPin()" style="padding:8px 18px;border:0;border-radius:6px;background:#ef4444;color:white;cursor:pointer;font-weight:600;">Cancel SOS</button>
+        <button onclick="closePinModal()" style="padding:8px 18px;border:1px solid #2c3340;border-radius:6px;background:#1d222c;color:#e8ecf1;cursor:pointer;">Back</button>
+      </div>
+      <div id="pinAttempts" class="small" style="margin-top:8px;color:#fdba74;">attempts: 0 / 3</div>
+    </div>`;
+  overlay.id = "pinOverlay";
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById("pinInput")?.focus(), 50);
+
+  // 15-second auto-dispatch timer — if no PIN entered, fire police
+  let n = 15;
+  pinCountdownTimer = setInterval(() => {
+    n--;
+    const el = document.getElementById("pinCountdown");
+    if (el) el.textContent = n;
+    if (n <= 0) {
+      clearInterval(pinCountdownTimer); pinCountdownTimer = null;
+      closePinModal();
+      logEvent("pin_timeout", "★ 15 s elapsed without PIN — dispatching emergency services (112/911)");
+      // Recipient is already locked as contact or police; mark dispatched.
+      const det = document.getElementById("recipientDetail");
+      if (det) det.textContent = "★ EMERGENCY SERVICES DIALLED — 15 s PIN window elapsed.";
+    }
+  }, 1000);
+}
+function closePinModal() {
+  if (pinCountdownTimer) { clearInterval(pinCountdownTimer); pinCountdownTimer = null; }
+  if (pinDispatchTimer) { clearTimeout(pinDispatchTimer); pinDispatchTimer = null; }
+  document.getElementById("pinOverlay")?.remove();
+}
+let pinAttempts = 0;
+
+/* Wraps resolveCase() — distress requires PIN; normal/stress is just resolved. */
+function attemptCancel() {
+  if (!caseActive) {
+    resolveCase();
+    return;
+  }
+  if (lastEngineState === "distress" || streamMode === "POST_DISTRESS") {
+    pinAttempts = 0;
+    showPinModal();
+  } else {
+    resolveCase();
+    setStreamMode("AGGREGATED");
+  }
+}
+function submitPin() {
+  const v = (document.getElementById("pinInput")?.value || "").trim();
+  if (v === "1234") {
+    logEvent("pin_correct", "Correct PIN — SOS cancelled, case resolved");
+    closePinModal();
+    pinAttempts = 0;
+    resolveCase();
+    setStreamMode("AGGREGATED");
+  } else {
+    pinAttempts++;
+    document.getElementById("pinAttempts").textContent = `attempts: ${pinAttempts} / 3 · WRONG PIN`;
+    document.getElementById("pinInput").value = "";
+    if (pinAttempts >= 3) {
+      logEvent("duress", "★ DURESS — 3 wrong PINs. UI shows cancelled; engine continues silently to recipient.");
+      closePinModal();
+      pinAttempts = 0;
+      // The case stays active — UI lies to the attacker, engine keeps the case alive
+      document.getElementById("recipientDetail").textContent =
+        "DURESS — UI shows CANCELLED to attacker; recipient still notified silently.";
+    }
+  }
+}
+
+/* ── State ─────────────────────────────────────────── */
+let caseActive = false;
+let caseId = null;
+let pressTime = 0;
+let elapsedTimer = null;
+const tierState = { T1: "pending", T2: "pending", T3: "pending", T4: "pending" };
+
+/* ── Helpers ──────────────────────────────────────── */
+const $ = (id) => document.getElementById(id);
+const val = (id) => parseFloat($(id).value);
+const txt = (id) => $(id).value;
+const chk = (id) => $(id).checked;
+const fmtTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+function nowHMS() {
+  const d = new Date();
+  return d.toLocaleTimeString([], { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3,'0').slice(0,2);
+}
+
+function logEvent(kind, msg) {
+  const cls = kind.startsWith("press") || kind.startsWith("sos") ? "ev-press"
+            : kind.startsWith("tier")   ? "ev-tier"
+            : kind.startsWith("resolve")|| kind.startsWith("safe") ? "ev-resolve"
+            : "ev-msg";
+  const div = document.createElement("div");
+  div.innerHTML = `<span class="ts">${nowHMS()}</span><span class="${cls}">${msg}</span>`;
+  $("timeline").prepend(div);
+}
+
+/* ── Vital bar rendering ──────────────────────────── */
+function renderBar(fillId, baseId, value, base, min, max, sigma, dangerLow=false) {
+  const range = max - min;
+  const fill  = $(fillId);
+  const baseEl = $(baseId);
+  const pct = Math.max(0, Math.min(100, ((value - min) / range) * 100));
+  fill.style.width = pct + "%";
+
+  // Colour by z-score magnitude, direction-aware
+  const z = (value - base) / sigma;
+  const zDanger = dangerLow ? (z <= -2.0) : (z >= 2.0);
+  const zWarn   = dangerLow ? (z <= -1.5) : (z >= 1.5);
+  fill.classList.remove("warn", "danger");
+  if (zDanger)      fill.classList.add("danger");
+  else if (zWarn)   fill.classList.add("warn");
+
+  if (baseEl) {
+    const basePct = ((base - min) / range) * 100;
+    baseEl.style.left = basePct + "%";
+  }
+}
+
+/* ── Engine output (read-only, set by syncDashboard from /classify) ── */
+let lastEngineState = "normal";
+let lastEngineConfidence = 0.5;
+let lastEngineSeverity = 0.0;
+
+/* ── Two-window state tracking (per-frame vs state-machine) ── */
+const frameHistory = [];      // last 30 (raw_state, weighted_score)
+let stateEnteredAt = Date.now();
+let frameCount = 0;
+
+function updateTwoWindows(verdict) {
+  if (!verdict) return;
+  frameCount++;
+
+  // ── Per-frame window
+  const rawState  = (verdict.raw_state || "normal").toUpperCase();
+  const wScore    = Number(verdict.weighted_score)     || 0;
+  const distConf  = Number(verdict.distress_confidence) || 0;
+  const motion    = verdict.motion_state || "—";
+  const sigs      = verdict.contributing_signals || [];
+
+  const pfs = document.getElementById("perFrameState");
+  if (pfs) {
+    pfs.textContent = rawState;
+    pfs.style.color = rawState === "DISTRESS" ? "#fca5a5"
+                    : rawState === "STRESS"   ? "#fde68a" : "#6ee7b7";
+  }
+  document.getElementById("perFrameMeta").textContent     = `frame ${frameCount} · ${new Date().toLocaleTimeString([], { hour12: false })}`;
+  document.getElementById("perFrameConf").textContent     = distConf.toFixed(3);
+  document.getElementById("perFrameWScore").textContent   = wScore.toFixed(3);
+  document.getElementById("perFrameSignals").textContent  = sigs.length ? sigs.join(" · ") : "none";
+  document.getElementById("perFrameMotion").textContent   = motion;
+
+  // Mini history strip — last 30 frames as dots
+  frameHistory.push(rawState.toLowerCase());
+  if (frameHistory.length > 30) frameHistory.shift();
+  const histEl = document.getElementById("perFrameHistory");
+  if (histEl) {
+    histEl.innerHTML = frameHistory.map(s => {
+      const c = s === "distress" ? "#ef4444" : s === "stress" ? "#facc15" : "#4ade80";
+      return `<div style="flex:1;background:${c};border-radius:2px;"></div>`;
+    }).join("");
+  }
+
+  // ── State-machine window (final, persistence-gated)
+  const finalState = (verdict.state || "normal").toUpperCase();
+  const persistS  = Number(verdict.persistence_s)         || 0;
+  const persistReq= Number(verdict.persistence_required_s)|| 60;
+
+  // Detect state transition for time-in-state counter
+  if (finalState !== document.getElementById("finalState")?.textContent) {
+    stateEnteredAt = Date.now();
+  }
+
+  const fs = document.getElementById("finalState");
+  if (fs) {
+    fs.textContent = finalState;
+    fs.style.color = finalState === "DISTRESS" ? "#fca5a5"
+                  : finalState === "STRESS"   ? "#fde68a" : "#6ee7b7";
+  }
+  document.getElementById("finalStateMeta").textContent =
+    finalState === rawState ? "stable — raw matches" : "rising — see persistence below";
+
+  const timeInS = (Date.now() - stateEnteredAt) / 1000;
+  document.getElementById("finalPersist").textContent =
+    `${persistS.toFixed(0)} / ${persistReq.toFixed(0)} s`;
+  document.getElementById("finalTimeIn").textContent =
+    `${timeInS.toFixed(1)} s`;
+
+  const recipient = verdict.recipient?.label || "—";
+  document.getElementById("finalRecipient").textContent =
+    caseActive ? recipient + " (locked)" : recipient;
+  document.getElementById("finalCaseStatus").textContent =
+    caseActive ? "ACTIVE — recipient frozen until resolved" : "idle";
+
+  const pct = Math.min(100, (persistS / persistReq) * 100);
+  document.getElementById("finalPersistFill").style.width = pct + "%";
+}
+
+/* ── Re-render the whole responder view from form ── */
+async function syncDashboard() {
+  const hr = val("hr"), hrv = val("hrv"), spo2 = val("spo2"), temp = val("temp");
+  let conf = lastEngineConfidence, sev = lastEngineSeverity;
+  let state = lastEngineState;
+  let signalsFromEngine = null;
+  let safetyRisk = null;
+  let reasoningFromEngine = null;
+
+  // ── Call the real engine if live ──
+  if (LIVE) {
+    const payload = {
+      user_id: "demo",     // per-user engine — persistence accumulates here
+      hr, hrv, spo2, temp,
+      baseline_hr: 72, baseline_hrv: 55, baseline_spo2: 98, baseline_temp: 36.6,
+      sqi_overall: 0.88, finger_on: true,
+      dyn_acc_mag: hr > 130 && chk("isWalking") ? 0.20 : (hr > 100 ? 0.10 : 0.02),
+      audio_enabled: txt("audioLive") === "yes",
+      audio_risk_level: val("audioDanger") > 0.5 ? "danger" : (val("audioDanger") > 0.25 ? "elevated" : "normal"),
+      audio_top_class: txt("audioSound"),
+      is_home_zone: chk("isHome"), is_work_zone: chk("isWork"),
+      is_known_area: chk("isKnown"), is_unfamiliar_area: chk("isUnknown"),
+      distance_from_home_km: val("distKm"),
+      hour_of_day: parseInt($("hourOfDay").value), is_night: chk("isNight"),
+      is_stationary: !chk("isWalking"), is_walking: chk("isWalking"),
+      is_vehicle_like_motion: false,
+      sudden_route_change: false, sudden_stop: false, phone_connected: true,
+      contact_threshold: val("contactThreshold"),
+      police_threshold:  val("policeThreshold"),
+      emergency_contact_name:  (SUBJECT_DETAILS[DAY?.profile?.id || "S01"] || {}).ice  || "R. Singh (sister)",
+      emergency_contact_phone: (SUBJECT_DETAILS[DAY?.profile?.id || "S01"] || {}).phone || "+91 98••• 11•••",
+    };
+    const verdict = await classifyOnBackend(payload);
+    if (verdict) {
+      state = verdict.state || state;
+      conf  = verdict.confidence ?? conf;
+      signalsFromEngine = verdict.contributing_signals || [];
+      safetyRisk = verdict.safety_risk_level;
+      reasoningFromEngine = (verdict.safety_reasoning || []).join(" · ") || null;
+      // Sev not directly returned — derive from state + confidence so the SOS escalation has a number
+      const stateWeight = { normal: 0.05, stress: 0.55, distress: 0.90 };
+      sev = (stateWeight[state] ?? 0.30) * Math.max(0.5, conf || 0.5);
+      // Persist for press() and the next sync
+      lastEngineState      = state;
+      lastEngineConfidence = conf;
+      lastEngineSeverity   = sev;
+      // Persistence build-up indicator — visible only when raw is "ahead" of final
+      const rawState  = verdict.raw_state || state;
+      const persistS  = Number(verdict.persistence_s)         || 0;
+      const persistReq= Number(verdict.persistence_required_s)|| 60;
+      const showBuild = (rawState !== "normal") && (rawState !== state) && persistS < persistReq;
+      const pCard = document.getElementById("persistenceCard");
+      if (pCard) {
+        pCard.style.display = showBuild ? "block" : "none";
+        if (showBuild) {
+          document.getElementById("persistenceRaw").textContent  = rawState;
+          document.getElementById("persistenceTime").textContent = `${persistS.toFixed(0)} / ${persistReq.toFixed(0)}s`;
+          document.getElementById("persistenceFill").style.width = `${Math.min(100, (persistS/persistReq)*100)}%`;
+        }
+      }
+
+      // ── Recipient card — confidence scale + who-gets-notified ──
+      renderRecipient({
+        distress_conf:     Number(verdict.distress_confidence) || 0,
+        contact_threshold: Number(verdict.contact_threshold)   || val("contactThreshold"),
+        police_threshold:  Number(verdict.police_threshold)    || val("policeThreshold"),
+        recipient:         verdict.recipient || { target: "ask_user", label: "user confirmation" },
+      });
+
+      // ── Two-window split: per-frame vs persistence-gated ──
+      updateTwoWindows(verdict);
+    }
+  }
+
+  $("hrVal").textContent = hr.toFixed(0);
+  $("hrvVal").textContent = hrv.toFixed(0);
+  $("spo2Val").textContent = spo2.toFixed(0);
+  $("tempVal").textContent = temp.toFixed(1);
+
+  renderBar("hrFill",   "hrBase",   hr,   72,   40, 180, /*σ*/ 5.0);
+  renderBar("hrvFill",  "hrvBase",  hrv,  55,   0,  100, /*σ*/ 8.0,  /*dangerLow=*/true);
+  renderBar("spo2Fill", "spo2Base", spo2, 98,   85, 100, /*σ*/ 0.8,  /*dangerLow=*/true);
+  renderBar("tempFill", "tempBase", temp, 36.6, 33, 40,  /*σ*/ 0.15);
+
+  // Engine verdict
+  const pill = $("statePill");
+  pill.textContent = state.toUpperCase();
+  pill.className = "state-pill state-" + state;
+  $("confVal").textContent = conf.toFixed(2);
+  $("sevVal").textContent  = sev.toFixed(2);
+  $("triggerVal").textContent = ({
+    manual_sos:     "Manual SOS",
+    auto_distress:  "Auto — distress",
+    fall:           "Auto — fall",
+    audio:          "Auto — scream",
+  })[txt("trigSource")];
+
+  // Signals — prefer engine output when live, fall back to mock z-score chips
+  let sigs;
+  if (signalsFromEngine !== null) {
+    const labels = { hr: "HR", hr_stability_score: "HRV", spo2: "SpO2", temp: "Temp", temp_drop: "Temp↓" };
+    sigs = signalsFromEngine.map(s => `${labels[s] || s} (engine)`);
+  } else {
+    sigs = [];
+    if (hr   > 100) sigs.push(`HR ↑ z=${((hr-72)/5).toFixed(1)}`);
+    if (hrv  < 30)  sigs.push(`HRV ↓ z=${((hrv-55)/8).toFixed(1)}`);
+    if (spo2 < 97)  sigs.push(`SpO2 ↓ z=${((spo2-98)/0.8).toFixed(1)}`);
+    if (temp > 37)  sigs.push(`Temp ↑ z=+${((temp-36.6)/0.15).toFixed(1)}`);
+  }
+  $("signalChips").innerHTML = sigs.length
+    ? sigs.map(s => `<span class="signal-chip">${s}</span>`).join("")
+    : '<span class="small">no flagged signals</span>';
+
+  // Audio
+  $("audioFill").style.width = (val("audioDanger") * 100) + "%";
+  $("voiceFill").style.width = (val("voiceStress") * 100) + "%";
+  const sound = txt("audioSound");
+  const danger = ["scream", "gunshot", "explosion"].includes(sound);
+  $("audioChips").innerHTML =
+    `<span class="sound-chip ${danger ? 'danger' : ''}">${sound} (${val("audioDanger").toFixed(2)})</span>` +
+    `<span class="sound-chip">Speech (0.42)</span>` +
+    `<span class="sound-chip">Traffic (0.31)</span>`;
+  const ab = $("audioBtn");
+  ab.classList.toggle("live", txt("audioLive") === "yes");
+  ab.innerHTML = (txt("audioLive") === "yes" ? '<span class="live-dot"></span> LIVE AUDIO LINK' : 'AUDIO LINK OFFLINE');
+
+  // Geo
+  const zone = chk("isHome") ? "Home zone" :
+               chk("isWork") ? "Work zone" :
+               chk("isKnown") ? "Known area" :
+               chk("isUnknown") ? "Unfamiliar area" : "Unknown";
+  const km = val("distKm");
+  $("zone").textContent = `${zone} · ${km.toFixed(1)} km from home`;
+  $("address").textContent = chk("isHome") ? "Home — 12 Marigold Lane"
+                            : chk("isWork") ? "Office — Tech Park"
+                            : chk("isUnknown") ? "MG Road, Bengaluru"
+                            : "Outdoor area";
+  $("indoor").textContent = chk("isHome") || chk("isWork") ? "Indoor" : "Outdoor";
+  $("motionDesc").textContent = chk("isWalking") ? "Walking, then sudden stop"
+                              : "Stationary for past 60s";
+
+  // Engine reasoning — prefer the real engine's safety_reasoning when live
+  let reasoning;
+  if (reasoningFromEngine) {
+    reasoning = reasoningFromEngine + (safetyRisk ? ` (risk: ${safetyRisk})` : "");
+  } else if (state === "distress" && sigs.length >= 3 && danger) reasoning = "Multi-channel distress signature corroborated by audio + geo context";
+  else if (state === "distress" && sigs.length >= 3)      reasoning = "Distress signature: HR + HRV + temp cross-corroborate";
+  else if (state === "distress" && danger)                reasoning = "Audio danger detected; physiology elevated";
+  else if (state === "stress")                            reasoning = "Single-channel stress: physiology elevated, no acute signature";
+  else if (state === "normal" && sigs.length === 0)       reasoning = "All physiological signals within baseline";
+  else                                                    reasoning = "Sub-threshold; manual trigger overrides";
+  $("reasoning").textContent = reasoning;
+}
+
+/* ── SOS press → start case ──────────────────────── */
+function press() {
+  caseActive = true;
+  caseId = "C-" + Math.floor(Math.random() * 9000 + 1000);
+  pressTime = Date.now();
+  $("caseId").textContent = caseId;
+  $("alertBar").classList.add("active");
+  $("alertTitle").textContent = "ACTIVE SOS — " + txt("trigSource").replace(/_/g, " ").toUpperCase();
+  $("alertMeta").textContent = `Triggered just now · ${lastEngineState.toUpperCase()} verdict · severity ${lastEngineSeverity.toFixed(2)}`;
+
+  // Reset tiers
+  ["T1", "T2", "T3", "T4"].forEach(t => { tierState[t] = "pending"; setTier(t, "pending", "PENDING"); });
+
+  // Fire appropriate tiers based on engine state (matches graduated trust cascade)
+  const state = lastEngineState, sev = lastEngineSeverity;
+  logEvent("press", `SOS button pressed — engine=${state}, severity=${sev.toFixed(2)}`);
+  logEvent("audio_capture", "Audio capture started (gating bypassed)");
+  logEvent("gps_pin",       "GPS pin captured ± 8 m");
+
+  if (state === "normal") {
+    logEvent("branch_A",  "BRANCH A — engine says NORMAL → asking user (60s confirm window)");
+    setTier("T1", "pending", "AWAITING USER");
+  } else if (state === "stress") {
+    logEvent("branch_B",  "BRANCH B — engine says STRESS → mid escalation");
+    setTier("T1", "firing", "NOTIFYING");
+    setTimeout(() => { if (caseActive) setTier("T1", "notified", "DELIVERED"); }, 1200);
+    setTimeout(() => { if (caseActive) forceTier("T2"); }, 4500);
+  } else {
+    logEvent("branch_C",  "BRANCH C — engine says DISTRESS → full escalation");
+    setTier("T1", "firing", "NOTIFYING");
+    setTier("T2", "firing", "NOTIFYING");
+    setTier("T3", "firing", "NOTIFYING");
+    setTimeout(() => { if (caseActive) {
+      setTier("T1", "notified", "DELIVERED");
+      setTier("T2", "notified", "DELIVERED");
+      setTier("T3", "notified", "DELIVERED");
+    } }, 1400);
+    setTimeout(() => { if (caseActive) forceTier("T4"); }, 8000);
+  }
+
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  elapsedTimer = setInterval(() => {
+    $("elapsed").textContent = fmtTime((Date.now() - pressTime) / 1000);
+  }, 250);
+
+  syncDashboard();
+}
+
+function setTier(t, status, label) {
+  tierState[t] = status;
+  const el = $("tier-" + t);
+  el.className = "tier " + status;
+  $("tier-" + t + "-status").textContent = label;
+}
+
+function forceTier(t) {
+  setTier(t, "firing", "NOTIFYING");
+  logEvent("tier_fire", `${t} ${({T1:'primary contact',T2:'all trusted',T3:'local responder',T4:'EMERGENCY DISPATCH (112/911)'}[t])} notified`);
+  setTimeout(() => setTier(t, "notified", "DELIVERED"), 1500);
+}
+function markResponded(t) {
+  setTier(t, "responded", "RESPONDED");
+  logEvent("tier_response", `${t} responded`);
+}
+
+function resolveCase() {
+  if (!caseActive) return;
+  caseActive = false;
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  $("alertBar").classList.remove("active");
+  $("alertTitle").textContent = "Case resolved";
+  $("alertMeta").textContent = "Marked safe · " + nowHMS();
+  logEvent("resolve", "CASE RESOLVED");
+  ["T1", "T2", "T3", "T4"].forEach(t => {
+    if (tierState[t] !== "pending") setTier(t, "responded", "CLEARED");
+  });
+}
+
+function resetAll() {
+  caseActive = false;
+  caseId = null;
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  $("alertBar").classList.remove("active");
+  $("alertTitle").textContent = "No active SOS";
+  $("alertMeta").textContent  = "All cases resolved · waiting";
+  $("caseId").textContent = "—";
+  $("elapsed").textContent = "00:00";
+  ["T1", "T2", "T3", "T4"].forEach(t => setTier(t, "pending", "PENDING"));
+  $("timeline").innerHTML = "";
+  syncDashboard();
+}
+
+/* ── Presets ──────────────────────────────────────── */
+const PRESETS = {
+  idle: {
+    engineState: "normal", hr: 72, hrv: 55, spo2: 98, temp: 36.6,
+    conf: 0.95, sev: 0.05, trigSource: "manual_sos",
+    audioSound: "silence", audioDanger: 0.05, voiceStress: 0.10, audioLive: "no",
+    isHome: true, isUnknown: false, isNight: false, isWalking: false,
+    distKm: 0.0, hourOfDay: 14,
+  },
+  confirm: {
+    engineState: "normal", hr: 78, hrv: 52, spo2: 98, temp: 36.7,
+    conf: 0.85, sev: 0.35, trigSource: "manual_sos",
+    audioSound: "speech", audioDanger: 0.15, voiceStress: 0.30, audioLive: "yes",
+    isHome: true, isUnknown: false, isNight: false, isWalking: false,
+    distKm: 0.0, hourOfDay: 16,
+  },
+  stress: {
+    // Tuned to land in the stress band — HR z=2.4, HRV z=-1.6, weighted ≈ 0.39
+    hr: 84, hrv: 42, spo2: 98, temp: 36.7,
+    trigSource: "auto_distress",
+    audioSound: "speech", audioDanger: 0.20, voiceStress: 0.55, audioLive: "yes",
+    isHome: false, isWork: true, isUnknown: false, isNight: false, isWalking: false,
+    distKm: 3.5, hourOfDay: 15,
+  },
+  assault: {
+    engineState: "distress", hr: 132, hrv: 12, spo2: 96.0, temp: 37.3,
+    conf: 0.92, sev: 0.95, trigSource: "manual_sos",
+    audioSound: "scream", audioDanger: 0.78, voiceStress: 0.62, audioLive: "yes",
+    isHome: false, isWork: false, isKnown: false, isUnknown: true,
+    isNight: true, isWalking: true, distKm: 4.2, hourOfDay: 1,
+  },
+  fall: {
+    engineState: "distress", hr: 95, hrv: 28, spo2: 97.5, temp: 36.7,
+    conf: 0.88, sev: 0.92, trigSource: "fall",
+    audioSound: "silence", audioDanger: 0.15, voiceStress: 0.10, audioLive: "yes",
+    isHome: true, isUnknown: false, isNight: false, isWalking: false,
+    distKm: 0.0, hourOfDay: 11,
+  },
+  duress: {
+    engineState: "distress", hr: 134, hrv: 11, spo2: 95.5, temp: 37.4,
+    conf: 0.94, sev: 0.97, trigSource: "manual_sos",
+    audioSound: "speech", audioDanger: 0.45, voiceStress: 0.85, audioLive: "yes",
+    isHome: false, isUnknown: true, isNight: true, isWalking: true,
+    distKm: 6.8, hourOfDay: 23,
+  },
+};
+
+/* ── Recipient + thresholds (new confidence-gated model) ── */
+function renderRecipient({ distress_conf, contact_threshold, police_threshold, recipient }) {
+  const dc = Math.max(0, Math.min(1, distress_conf));
+  const cm = document.getElementById("contactMark");
+  const pm = document.getElementById("policeMark");
+  const cf = document.getElementById("confMark");
+  if (cm) cm.style.left = (contact_threshold * 100) + "%";
+  if (pm) pm.style.left = (police_threshold  * 100) + "%";
+  if (cf) cf.style.left = (dc * 100) + "%";
+
+  // Headline numeric + band
+  const ecn = document.getElementById("escalConf");
+  const ebd = document.getElementById("escalBand");
+  const ect = document.getElementById("escalCT");
+  const ept = document.getElementById("escalPT");
+  if (ecn) ecn.textContent = dc.toFixed(3);
+  if (ect) ect.textContent = contact_threshold.toFixed(2);
+  if (ept) ept.textContent = police_threshold.toFixed(2);
+  if (ebd) {
+    const target = (recipient || {}).target || "ask_user";
+    if (target === "emergency_services") {
+      ebd.textContent = "POLICE";
+      ebd.style.background = "#2a1818"; ebd.style.color = "#fca5a5"; ebd.style.border = "1px solid #5a2424";
+    } else if (target === "contact") {
+      ebd.textContent = "CONTACT";
+      ebd.style.background = "#2a2716"; ebd.style.color = "#fde68a"; ebd.style.border = "1px solid #5a4520";
+    } else {
+      ebd.textContent = "ASK USER";
+      ebd.style.background = "#16291f"; ebd.style.color = "#6ee7b7"; ebd.style.border = "1px solid #1f3f30";
+    }
+  }
+
+  const lbl  = document.getElementById("recipientLabel");
+  const det  = document.getElementById("recipientDetail");
+  const box  = document.getElementById("recipientBox");
+  if (!lbl) return;
+
+  const target = recipient.target || "ask_user";
+  if (target === "ask_user") {
+    lbl.textContent = "User confirmation prompt";
+    det.textContent = `Distress confidence ${dc.toFixed(2)} below contact threshold ${contact_threshold.toFixed(2)} — engine asks the user before notifying anyone.`;
+    box.style.borderColor = "#1f3f30";
+    box.style.background  = "#0f1a14";
+  } else if (target === "contact") {
+    lbl.textContent = recipient.label || "Emergency contact";
+    det.textContent = `${recipient.phone || ""} · SMS + voice call + live audio link. Cancellation window: 30 s (PIN required).`;
+    box.style.borderColor = "#5a4520";
+    box.style.background  = "#221a0a";
+  } else if (target === "emergency_services") {
+    lbl.textContent = recipient.label || "Emergency services (112 / 911)";
+    det.textContent = `Public dispatcher line. Cancellation window: 15 s (PIN required). Duress-protected above severity 0.85.`;
+    box.style.borderColor = "#5a2424";
+    box.style.background  = "#221010";
+  }
+}
+
+/* ── Old tier functions — kept as no-ops so legacy callsites don't break ── */
+function setTier()         {}
+function forceTier()       {}
+function markResponded()   {}
+
+async function resetEngineAccumulator() {
+  if (!LIVE) return;
+  try {
+    await fetch(API + "/reset-engine?user_id=demo", { method: "POST" });
+    logEvent("engine_reset", "Backend persistence accumulator cleared");
+    // Hide the build-up indicator immediately
+    const pCard = document.getElementById("persistenceCard");
+    if (pCard) pCard.style.display = "none";
+    syncDashboard();
+  } catch (e) {}
+}
+
+async function applyPreset(name) {
+  resetAll();
+  await resetEngineAccumulator();   // each preset starts from 0/60s
+  const p = PRESETS[name]; if (!p) return;
+  ["isHome", "isWork", "isKnown", "isUnknown", "isNight", "isWalking"].forEach(k => $(k).checked = false);
+  for (const [k, v] of Object.entries(p)) {
+    const el = $(k);
+    if (!el) continue;
+    if (el.type === "checkbox") el.checked = !!v;
+    else el.value = v;
+  }
+  syncDashboard();
+  logEvent("preset", `Loaded preset: ${name}`);
+}
+
+/* ── Wire up live form → dashboard sync ────────── */
+document.querySelectorAll(".sim input, .sim select").forEach(el => {
+  el.addEventListener("input",  syncDashboard);
+  el.addEventListener("change", syncDashboard);
+});
+
+/* ── Threshold sliders — keep labels in sync with the slider position ── */
+/* ── Live "Start at minute" — jumps as soon as the user types ── */
+{
+  const el = document.getElementById("dayStart");
+  let debounceT = null;
+  if (el) {
+    el.addEventListener("input", () => {
+      if (debounceT) clearTimeout(debounceT);
+      debounceT = setTimeout(() => {
+        const m = parseInt(el.value);
+        if (!isNaN(m) && DAY && m >= 0 && m < DAY.frames.length) {
+          jumpTo(m, `manual jump to minute ${m}`);
+        }
+      }, 350);   // small debounce so typing 1-2-3-4 doesn't fire 4 times
+    });
+  }
+}
+
+["contactThreshold", "policeThreshold"].forEach(id => {
+  const slider = document.getElementById(id);
+  if (slider) {
+    const update = () => {
+      document.getElementById(id + "Label").textContent = Number(slider.value).toFixed(2);
+    };
+    slider.addEventListener("input", update);
+    update();
+  }
+});
+
+/* ── Boot ────────────────────────────────────────── */
+(async () => {
+  await probeEngine();        // sets LIVE and the engine-status badge
+  await loadSubjectDay();     // loads Priya's 1440-frame day
+  await resetEngineAccumulator();
+  // Auto-start the aggregated stream at 13:00 (skip the morning,
+  // gives boss a few minutes of calm before the 14:00 stress block).
+  document.getElementById("dayStart").value = 780;
+  playDay();
+})();
+</script>
+</body></html>

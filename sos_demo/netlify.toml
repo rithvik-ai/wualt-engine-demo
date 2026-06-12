@@ -1,0 +1,28 @@
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options          = "DENY"
+    X-Content-Type-Options   = "nosniff"
+    Referrer-Policy          = "no-referrer"
+    Permissions-Policy       = "microphone=(), geolocation=(), camera=()"
+
+[[redirects]]
+  from = "/sos"
+  to   = "/"
+  status = 200
+
+# Root URL → day-stream demo (multi-subject, the "main" demo)
+[[redirects]]
+  from = "/"
+  to   = "/responder_day/"
+  status = 302
+  force = true
+
+# Optional aliases for the other demos
+[[redirects]]
+  from = "/manual"
+  to   = "/index.html"
+  status = 200

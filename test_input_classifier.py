@@ -57,6 +57,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── v1 production API (manual-trigger mode: ingest + on-demand evaluate) ─
+from wualt_api_v1 import router as v1_router
+app.include_router(v1_router)
+
 # ── Scenario dataset (lazy-loaded, stdlib csv) ──────────────
 _SCENARIO_ROWS: Optional[List[Dict[str, str]]] = None
 def _load_scenarios() -> List[Dict[str, str]]:
